@@ -7,7 +7,7 @@ require('chai')
   .use(require('chai-as-promised'))
   .should()
 
-contract('Exchange', ([deployer, feeAccount, user1]) => {
+contract('Exchange', ([deployer, feeAccount, user1, user2]) => {
   let token
   let exchange
   const feePercent = 10
@@ -200,5 +200,88 @@ contract('Exchange', ([deployer, feeAccount, user1]) => {
       const result = await exchange.balanceOf(ETHER_ADDRESS, user1)
       result.toString().should.equal(amount.toString())
     })
+  })
+
+  describe ('making orders', async () => {
+    let result
+    
+    beforeEach (async () => {
+      result = await exchange.makeOrder(token.address, tokens(1), ETHER_ADDRESS, ether(1), { from: user1 })
+    })
+
+    it ('tracks the newly created order', async () => {
+      const orderCount = await exchange.orderCount()
+      orderCount.toString().should.equal('1')
+      const order = await exchange.orders('1')
+      order.id.toString().should.equal('1', 'id is correct')
+      order.user.should.equal(user1, 'user is correct')
+      order.tokenGet.should.equal(token.address, 'token give is correct')
+      order.amountGet.toString().should.equal(tokens(1).toString(), 'amount get is correct')
+      order.tokenGive.should.equal(ETHER_ADDRESS, 'token give is correct')
+      order.amountGive.toString().should.equal(ether(1).toString(), 'token give is correct')
+      order.timestamp.toString().length.should.be.at.least(1, 'timestamp is present')
+    })
+
+    it ('emits an "Order" event', async () => {
+      const log = result.logs[0]
+      log.event.should.eq('Order')
+      const event = log.args
+      event.id.toString().should.equal('1', 'id is correct')
+      event.user.should.equal(user1, 'user is correct')
+      event.tokenGet.should.equal(token.address, 'token give is correct')
+      event.amountGet.toString().should.equal(tokens(1).toString(), 'amount get is correct')
+      event.tokenGive.should.equal(ETHER_ADDRESS, 'token give is correct')
+      event.amountGive.toString().should.equal(ether(1).toString(), 'token give is correct')
+      event.timestamp.toString().length.should.be.at.least(1, 'timestamp is present')
+    })
+  })
+
+  describe ('order actions', async () => {
+    beforeEach(async () => {
+      // user deposits 1 ether
+      await exchange.depositEther({ from: user1, value: ether(1) })
+      // user makes an order to buy tokens with Ether
+      await exchange.makeOrder(token.address, tokens(1), ETHER_ADDRESS, ether(1), { from: user1 })
+    })
+
+    describe('cancelling orders', async () => {
+      let result
+
+      describe('success', async () => {
+        beforeEach(async () => {
+          result = await exchange.cancelOrder('1', { from: user1 })
+        })
+
+        it ('updates cancelled orders', async () => {
+          const orderCancelled = await exchange.orderCancelled(1)
+          orderCancelled.should.equal(true)
+        })
+
+        it ('emits an "Cancel" event', async () => {
+          const log = result.logs[0]
+          log.event.should.eq('Cancel')
+          const event = log.args
+          event.id.toString().should.equal('1', 'id is correct')
+          event.user.should.equal(user1, 'user is correct')
+          event.tokenGet.should.equal(token.address, 'token give is correct')
+          event.amountGet.toString().should.equal(tokens(1).toString(), 'amount get is correct')
+          event.tokenGive.should.equal(ETHER_ADDRESS, 'token give is correct')
+          event.amountGive.toString().should.equal(ether(1).toString(), 'token give is correct')
+          event.timestamp.toString().length.should.be.at.least(1, 'timestamp is present')
+        })
+      })
+
+      describe ('failure', async () => {
+        it ('rejects invalid order ids', async () => {
+          const invalidOrderId = 99999
+          await exchange.cancelOrder(invalidOrderId, { from: user1 }).should.be.rejectedWith(EVM_REVERT)
+        })
+
+        it ('rejects unauthorized cancelations', async () => {
+          await exchange.cancelOrder('1', { from: user2 }).should.be.rejectedWith(EVM_REVERT)
+        })
+      })
+    })
+
   })
 })

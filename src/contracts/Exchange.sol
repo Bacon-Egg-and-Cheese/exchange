@@ -1,15 +1,3 @@
-// TODO:
-// [x] Set the fee
-// [x] Deposit Ether
-// [x] Withdraw Ether
-// [x] Deposit Tokens
-// [x] Withdraw Tokens
-// [x] Check balances
-// [x] Make order
-// [x] Cancel order
-// [x] Fill order
-// [x] Charge fees
-
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "./Token.sol";
 
